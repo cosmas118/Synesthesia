@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapel Hill Concerts</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --surface: #161616;
+    --card: #1c1c1c;
+    --border: #2a2a2a;
+    --accent: #e8c547;
+    --accent2: #c4503a;
+    --text: #f0ede6;
+    --muted: #888;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; min-height: 100vh; }
+
+  /* ── CONFIG WARNING ── */
+  #configWarning {
+    position: fixed; inset: 0; background: #0d0d0d; z-index: 9999;
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    padding: 2rem;
+  }
+  .config-box {
+    background: var(--surface); border: 1px solid var(--accent2);
+    padding: 2.5rem; max-width: 540px; width: 100%;
+  }
+  .config-box h2 { font-family: 'Playfair Display', serif; font-size: 1.5rem; margin-bottom: 1rem; }
+  .config-box p { font-size: 0.72rem; color: var(--muted); line-height: 2; }
+  .config-box code { color: var(--accent); background: var(--bg); padding: 0.1rem 0.4rem; }
+  .config-box pre {
+    background: var(--bg); border: 1px solid var(--border); padding: 1rem;
+    font-size: 0.65rem; color: #aaa; line-height: 1.8; overflow-x: auto; margin-top: 1rem;
+  }
+
+  /* ── SCREENS ── */
+  #loginScreen {
+    min-height: 100vh; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 2rem; padding: 2rem;
+  }
+  #loginScreen.active { display: flex; }
+  #appScreen { display: none; flex-direction: column; min-height: 100vh; }
+  #appScreen.active { display: flex; }
+
+  /* ── LOGIN BOX ── */
+  .login-box {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 2.5rem; width: 100%; max-width: 420px;
+    display: flex; flex-direction: column; gap: 1.25rem;
+  }
+  .login-eyebrow { font-size: 0.62rem; letter-spacing: 0.25em; color: var(--accent); text-transform: uppercase; }
+  .login-title { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 900; line-height: 1.1; }
+  .login-title span { color: var(--accent); }
+  .login-sub { font-size: 0.7rem; color: var(--muted); line-height: 1.6; }
+  .login-input {
+    background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); font-family: 'DM Mono', monospace;
+    font-size: 0.85rem; padding: 0.8rem 1rem; width: 100%;
+    transition: border-color 0.2s;
+  }
+  .login-input:focus { outline: none; border-color: var(--accent); }
+  .login-input::placeholder { color: var(--muted); }
+  .btn-primary {
+    background: var(--accent); color: #000; border: none;
+    font-family: 'DM Mono', monospace; font-size: 0.72rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 0.85rem; cursor: pointer; width: 100%;
+    transition: opacity 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+  }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-secondary {
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 0.6rem; cursor: pointer; width: 100%;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .btn-secondary:hover { border-color: var(--accent2); color: var(--accent2); }
+  .login-error { font-size: 0.65rem; color: var(--accent2); display: none; }
+  .recent-users { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .recent-chip {
+    font-size: 0.65rem; padding: 0.35rem 0.75rem; border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer; border-radius: 999px; transition: all 0.15s;
+  }
+  .recent-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .recent-label { font-size: 0.62rem; color: var(--muted); letter-spacing: 0.1em; }
+
+  /* ── HEADER ── */
+  header {
+    padding: 2rem 2rem 1.5rem; border-bottom: 1px solid var(--border);
+    position: relative; overflow: hidden;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    flex-wrap: wrap; gap: 1rem;
+  }
+  header::before {
+    content: ''; position: absolute; top: -60px; right: -60px;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(232,197,71,0.1) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .header-label { font-size: 0.62rem; letter-spacing: 0.25em; color: var(--accent); text-transform: uppercase; margin-bottom: 0.3rem; }
+  h1 {
+    font-family: 'Playfair Display', serif; font-size: clamp(1.6rem, 4vw, 2.8rem);
+    font-weight: 900; line-height: 1; cursor: pointer; transition: opacity 0.2s;
+  }
+  h1:hover { opacity: 0.75; }
+  h1 span { color: var(--accent); }
+  .user-pill {
+    display: flex; align-items: center; gap: 0.75rem;
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 0.5rem 1rem; font-size: 0.7rem; letter-spacing: 0.08em;
+  }
+  .user-pill strong { color: var(--accent); }
+  .btn-logout {
+    background: none; border: none; color: var(--muted);
+    font-family: 'DM Mono', monospace; font-size: 0.65rem;
+    cursor: pointer; letter-spacing: 0.08em; transition: color 0.2s;
+  }
+  .btn-logout:hover { color: var(--accent2); }
+
+  /* ── CONTROLS ── */
+  .controls {
+    padding: 1rem 2rem; display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0;
+    background: rgba(13,13,13,0.96); backdrop-filter: blur(8px); z-index: 100;
+  }
+  select, .btn-filter {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    font-family: 'DM Mono', monospace; font-size: 0.68rem; padding: 0.45rem 0.85rem;
+    border-radius: 2px; cursor: pointer; letter-spacing: 0.05em;
+    transition: border-color 0.2s; -webkit-appearance: none;
+  }
+  select:hover, .btn-filter:hover { border-color: var(--accent); }
+  select:focus { outline: none; border-color: var(--accent); }
+  .btn-filter.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 500; }
+  .count-badge { margin-left: auto; font-size: 0.62rem; color: var(--muted); letter-spacing: 0.1em; white-space: nowrap; }
+
+  /* ── GRID ── */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 1px; background: var(--border); }
+  .grid-loading { grid-column: 1/-1; display: flex; align-items: center; justify-content: center; padding: 5rem; gap: 1rem; color: var(--muted); font-size: 0.75rem; letter-spacing: 0.1em; }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--card); padding: 1.4rem;
+    display: flex; flex-direction: column; gap: 0.65rem;
+    transition: background 0.2s; position: relative;
+  }
+  .card:hover { background: #202020; }
+  .card.is-interested { background: #1e1c0f; }
+  .card.is-interested::before {
+    content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%; background: var(--accent);
+  }
+  .card-date { font-size: 0.62rem; letter-spacing: 0.2em; color: var(--accent); text-transform: uppercase; }
+  .card-artist { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; line-height: 1.2; }
+  .card-venue { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .card-genres { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .genre-tag {
+    font-size: 0.58rem; padding: 0.18rem 0.5rem; border: 1px solid var(--border);
+    border-radius: 999px; color: var(--muted); cursor: pointer; letter-spacing: 0.05em;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .genre-tag:hover { border-color: var(--accent); color: var(--accent); }
+  .card-desc {
+    font-size: 0.7rem; line-height: 1.65; color: #aaa;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .card-interested-by { display: flex; flex-wrap: wrap; gap: 0.3rem; min-height: 0.5rem; }
+  .avatar {
+    font-size: 0.58rem; padding: 0.15rem 0.5rem;
+    background: rgba(232,197,71,0.12); border: 1px solid rgba(232,197,71,0.3);
+    color: var(--accent); border-radius: 999px; letter-spacing: 0.03em;
+  }
+  .card-footer { margin-top: auto; padding-top: 0.25rem; }
+  .btn-interested {
+    font-family: 'DM Mono', monospace; font-size: 0.62rem; letter-spacing: 0.1em;
+    padding: 0.4rem 0.85rem; border-radius: 2px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); cursor: pointer;
+    transition: all 0.2s; text-transform: uppercase;
+  }
+  .btn-interested:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-interested.active { background: var(--accent); color: #000; border-color: var(--accent); }
+  .empty { grid-column: 1/-1; text-align: center; padding: 5rem 2rem; color: var(--muted); font-size: 0.8rem; letter-spacing: 0.1em; }
+
+  /* ── INTERESTED BAR ── */
+  .interested-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--accent); color: #000; padding: 0.85rem 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 0.7rem; font-family: 'DM Mono', monospace; letter-spacing: 0.1em;
+    transform: translateY(100%); transition: transform 0.3s ease; z-index: 200;
+  }
+  .interested-bar.visible { transform: translateY(0); }
+
+  /* ── LOADING SPINNER ── */
+  .spinner {
+    display: inline-block; width: 12px; height: 12px;
+    border: 2px solid rgba(0,0,0,0.25); border-top-color: currentColor;
+    border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle;
+  }
+  .spinner.light { color: var(--accent); border-color: rgba(232,197,71,0.25); border-top-color: var(--accent); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── ADMIN OVERLAY ── */
+  #adminOverlay {
+    position: fixed; inset: 0; background: rgba(13,13,13,0.97); z-index: 600;
+    display: none; align-items: center; justify-content: center; padding: 2rem;
+  }
+  #adminOverlay.open { display: flex; }
+
+  /* ── DASHBOARD ── */
+  #dashboard {
+    position: fixed; inset: 0; background: var(--bg);
+    z-index: 500; overflow-y: auto; display: none; flex-direction: column;
+  }
+  #dashboard.open { display: flex; }
+  .dash-header {
+    padding: 2rem; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; background: var(--bg); z-index: 10;
+  }
+  .dash-title { font-family: 'Playfair Display', serif; font-size: 1.8rem; font-weight: 900; }
+  .dash-title span { color: var(--accent); }
+  .btn-close {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.1em;
+    padding: 0.5rem 1rem; cursor: pointer; transition: all 0.2s; text-transform: uppercase;
+  }
+  .btn-close:hover { border-color: var(--accent2); color: var(--accent2); }
+  .dash-body { padding: 2rem; display: flex; flex-direction: column; gap: 2.5rem; }
+  .dash-section-title {
+    font-size: 0.62rem; letter-spacing: 0.25em; color: var(--accent); text-transform: uppercase;
+    margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .btn-copy {
+    background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+    font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.08em;
+    padding: 0.3rem 0.7rem; cursor: pointer; transition: all 0.2s; text-transform: uppercase;
+  }
+  .btn-copy:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-copy.copied { border-color: #4caf50; color: #4caf50; }
+  .user-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1px; background: var(--border); }
+  .user-card { background: var(--card); padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; }
+  .user-card-name { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; }
+  .user-show-list { display: flex; flex-direction: column; gap: 0.4rem; }
+  .user-show-item { font-size: 0.68rem; color: #aaa; line-height: 1.4; }
+  .user-show-item strong { color: var(--text); display: block; }
+  .user-show-item span { color: var(--muted); font-size: 0.62rem; }
+  .none-label { font-size: 0.68rem; color: var(--muted); font-style: italic; }
+  .show-interest-list { display: flex; flex-direction: column; gap: 1px; background: var(--border); }
+  .show-interest-row {
+    background: var(--card); padding: 0.9rem 1.25rem;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap;
+  }
+  .show-interest-info { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; min-width: 180px; }
+  .show-interest-artist { font-size: 0.82rem; font-weight: 500; }
+  .show-interest-meta { font-size: 0.62rem; color: var(--muted); letter-spacing: 0.05em; }
+  .show-interest-names { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+  .no-interest { font-size: 0.62rem; color: var(--muted); font-style: italic; }
+  .btn-delete {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.08em;
+    padding: 0.3rem 0.6rem; cursor: pointer; text-transform: uppercase; transition: all 0.2s;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .btn-delete:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* ── CSV UPLOAD ── */
+  .csv-hint {
+    font-size: 0.62rem; color: var(--muted); line-height: 1.9;
+    background: var(--bg); border: 1px solid var(--border); padding: 1rem;
+  }
+  .csv-hint code { color: var(--accent); }
+  .csv-zone {
+    border: 2px dashed var(--border); padding: 2.5rem 2rem; text-align: center;
+    cursor: pointer; transition: border-color 0.2s, background 0.2s;
+    position: relative; margin-top: 0.75rem;
+  }
+  .csv-zone:hover, .csv-zone.over { border-color: var(--accent); background: rgba(232,197,71,0.03); }
+  .csv-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .csv-zone-label { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.08em; }
+  .csv-zone-label strong { color: var(--accent); }
+  .csv-preview-box { margin-top: 1rem; background: var(--bg); border: 1px solid var(--border); padding: 1rem; max-height: 220px; overflow-y: auto; display: none; }
+  .csv-row { font-size: 0.65rem; color: #aaa; padding: 0.35rem 0; border-bottom: 1px solid var(--border); display: flex; gap: 0.75rem; flex-wrap: wrap; }
+  .csv-row:last-child { border-bottom: none; }
+  .csv-row strong { color: var(--text); }
+  .csv-actions { display: none; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; align-items: center; }
+  .btn-import {
+    background: var(--accent); color: #000; border: none;
+    font-family: 'DM Mono', monospace; font-size: 0.68rem; letter-spacing: 0.1em;
+    padding: 0.6rem 1.25rem; cursor: pointer; text-transform: uppercase; transition: opacity 0.2s;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .btn-import:hover { opacity: 0.85; }
+  .btn-import:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-csv-clear {
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.08em;
+    padding: 0.5rem 1rem; cursor: pointer; text-transform: uppercase; transition: all 0.2s;
+  }
+  .btn-csv-clear:hover { border-color: var(--accent2); color: var(--accent2); }
+  .csv-msg { font-size: 0.65rem; color: var(--muted); }
+  .csv-msg.ok  { color: #4caf50; }
+  .csv-msg.err { color: var(--accent2); }
+
+  @media (max-width: 600px) {
+    header { padding: 1.5rem 1rem 1rem; }
+    .controls { padding: 0.75rem 1rem; }
+    .grid { grid-template-columns: 1fr; }
+    .dash-body { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ CONFIG WARNING ══ -->
+<div id="configWarning">
+  <div class="config-box">
+    <h2>⚙️ Setup Required</h2>
+    <p>
+      Edit the three constants at the top of the <code>&lt;script&gt;</code> block:<br><br>
+      <code>SUPABASE_URL</code> → your project URL from Supabase → Settings → API<br>
+      <code>SUPABASE_ANON_KEY</code> → the <code>anon public</code> key<br>
+      <code>ADMIN_PASSWORD</code> → any password you choose for the organizer view<br><br>
+      Then run this SQL in your Supabase SQL editor:
+    </p>
+    <pre>
+-- Enable UUID extension
+create extension if not exists "pgcrypto";
+
+-- Concerts table
+create table concerts (
+  id uuid primary key default gen_random_uuid(),
+  date text not null,
+  venue text,
+  artist text not null,
+  desc text,
+  genres text[] default '{}',
+  link text,
+  created_at timestamptz default now()
+);
+
+-- Users table (name-only)
+create table users (
+  name text primary key,
+  created_at timestamptz default now()
+);
+
+-- Interests join table
+create table interests (
+  user_name text references users(name) on delete cascade,
+  concert_id uuid references concerts(id) on delete cascade,
+  primary key (user_name, concert_id)
+);
+
+-- Enable realtime for both tables
+alter publication supabase_realtime add table interests;
+alter publication supabase_realtime add table concerts;
+
+-- RLS: public read on concerts, authenticated insert/delete on interests
+alter table concerts enable row level security;
+alter table users    enable row level security;
+alter table interests enable row level security;
+
+create policy "Public read concerts"   on concerts  for select using (true);
+create policy "Public insert concerts" on concerts  for insert with check (true);
+create policy "Public delete concerts" on concerts  for delete using (true);
+create policy "Public read users"      on users     for select using (true);
+create policy "Public upsert users"    on users     for insert with check (true);
+create policy "Public read interests"  on interests for select using (true);
+create policy "Public insert interests" on interests for insert with check (true);
+create policy "Public delete interests" on interests for delete using (true);</pre>
+  </div>
+</div>
+
+<!-- ══ LOGIN ══ -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-eyebrow">Chapel Hill · Concerts</div>
+    <div class="login-title">Concert<br><span>Tracker</span></div>
+    <div class="login-sub">Enter your name to browse shows and mark what you're interested in. Your picks sync live to the organizer.</div>
+    <input class="login-input" id="nameInput" type="text" placeholder="Your first name…" maxlength="32" autocomplete="off" />
+    <button class="btn-primary" id="btnLogin">Let's go →</button>
+    <div class="login-error" id="loginError"></div>
+    <div id="recentWrap" style="display:none; flex-direction:column; gap:0.5rem;">
+      <div class="recent-label">Previous users on this device</div>
+      <div class="recent-users" id="recentUsers"></div>
+    </div>
+    <button class="btn-secondary" id="btnOpenAdmin">Organizer view ↗</button>
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="appScreen">
+  <header>
+    <div>
+      <div class="header-label">Chapel Hill &amp; Carrboro</div>
+      <h1 id="homeLink" title="Back to home">Concerts <span>Tracker</span></h1>
+    </div>
+    <div class="user-pill">
+      Logged in as <strong id="userLabel"></strong>
+      <button class="btn-logout" id="btnLogout">Switch user</button>
+    </div>
+  </header>
+
+  <div class="controls">
+    <select id="venueFilter"><option value="">All Venues</option></select>
+    <select id="dateFilter"><option value="">All Dates</option></select>
+    <select id="genreFilter"><option value="">All Genres</option></select>
+    <button class="btn-filter" id="interestedFilter">★ My List</button>
+    <div class="count-badge" id="countBadge">— shows</div>
+  </div>
+
+  <div class="grid" id="grid">
+    <div class="grid-loading"><span class="spinner light"></span>&nbsp; Loading concerts…</div>
+  </div>
+
+  <div class="interested-bar" id="intBar">
+    <span>★ <strong id="intCount">0</strong> shows on your list</span>
+    <span style="opacity:0.7;font-size:0.62rem;">Synced live to organizer</span>
+  </div>
+</div>
+
+<!-- ══ ADMIN PASSWORD OVERLAY ══ -->
+<div id="adminOverlay">
+  <div class="login-box" style="max-width:380px;">
+    <div class="login-eyebrow">Organizer Access</div>
+    <div class="login-title" style="font-size:1.4rem;">Enter <span>Password</span></div>
+    <input class="login-input" id="adminPwInput" type="password" placeholder="Organizer password…" />
+    <button class="btn-primary" id="btnAdminSubmit">Unlock →</button>
+    <div class="login-error" id="adminError"></div>
+    <button class="btn-secondary" id="btnAdminCancel">Cancel</button>
+  </div>
+</div>
+
+<!-- ══ DASHBOARD ══ -->
+<div id="dashboard">
+  <div class="dash-header">
+    <div class="dash-title">Organizer <span>Dashboard</span></div>
+    <button class="btn-close" id="btnCloseDash">← Back</button>
+  </div>
+  <div class="dash-body">
+
+    <div>
+      <div class="dash-section-title">
+        By Person
+        <button class="btn-copy" id="copyByPerson">Copy as text</button>
+      </div>
+      <div class="user-cards" id="byPersonPanel">
+        <div style="padding:1.5rem;font-size:0.72rem;color:var(--muted);background:var(--card);">Loading…</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="dash-section-title">
+        By Show — Who's Interested
+        <button class="btn-copy" id="copyByShow">Copy as text</button>
+      </div>
+      <div class="show-interest-list" id="byShowPanel"></div>
+    </div>
+
+    <!-- CSV Import -->
+    <div>
+      <div class="dash-section-title">Import Events via CSV</div>
+      <div class="csv-hint">
+        <strong style="color:var(--accent);font-size:0.62rem;letter-spacing:0.1em;">EXPECTED COLUMNS (header row required):</strong><br>
+        <code>date, venue, artist, desc, genres, link</code><br><br>
+        • <code>date</code> — e.g. <code>3/1</code>&nbsp; • &nbsp;<code>genres</code> — pipe-separated: <code>Folk|Indie Rock</code><br>
+        • Duplicates (same artist + date) are automatically skipped<br>
+        • Events save to Supabase and appear on all devices instantly
+      </div>
+      <div class="csv-zone" id="csvZone">
+        <input type="file" id="csvFile" accept=".csv,text/csv" />
+        <div class="csv-zone-label"><strong>Drop a CSV file here</strong> or click to browse</div>
+      </div>
+      <div class="csv-preview-box" id="csvPreview"></div>
+      <div class="csv-actions" id="csvActions">
+        <button class="btn-import" id="btnImport" disabled>Import Events</button>
+        <button class="btn-csv-clear" id="btnCsvClear">Clear</button>
+        <span class="csv-msg" id="csvMsg"></span>
+      </div>
+    </div>
+
+    <!-- Manage Events -->
+    <div>
+      <div class="dash-section-title">Manage Events</div>
+      <div class="show-interest-list" id="managePanel"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  ⚙️  EDIT THESE THREE VALUES BEFORE USE
+// ═══════════════════════════════════════════
+const SUPABASE_URL      = 'https://onskirzxrhwsmqihfvdl.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_YGFxfgWCnTmOSvTPDH7VIw_AzlcIgz8';
+const ADMIN_PASSWORD    = 'Cosmas121*';
+// ═══════════════════════════════════════════
+
+// Show config warning if unconfigured
+if (SUPABASE_URL === 'YOUR_SUPABASE_URL') {
+  document.getElementById('configWarning').style.display = 'flex';
+} else {
+  document.getElementById('loginScreen').classList.add('active');
+}
+
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ── STATE ──
+let currentUser   = null;
+let concerts      = [];         // full concert list from Supabase
+let myInterests   = new Set();  // concert IDs the current user marked
+let allInterests  = {};         // { userName: Set<concertId> }
+let activeGenre   = '';
+let showingMine   = false;
+let filtersReady  = false;
+let rtChannel     = null;
+
+// ─────────────────────────────────────────
+//  RECENT USERS  (localStorage only)
+// ─────────────────────────────────────────
+const LS_RECENT = 'chconcerts_recent_v2';
+const getRecent = () => { try { return JSON.parse(localStorage.getItem(LS_RECENT)||'[]'); } catch { return []; } };
+const pushRecent = name => {
+  let arr = getRecent().filter(n => n !== name);
+  arr.unshift(name);
+  localStorage.setItem(LS_RECENT, JSON.stringify(arr.slice(0, 8)));
+};
+
+function refreshRecentChips() {
+  const users = getRecent();
+  const wrap = document.getElementById('recentWrap');
+  const el   = document.getElementById('recentUsers');
+  if (!users.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'flex';
+  el.innerHTML = '';
+  users.forEach(u => {
+    const chip = document.createElement('div');
+    chip.className = 'recent-chip';
+    chip.textContent = u;
+    chip.onclick = () => login(u);
+    el.appendChild(chip);
+  });
+}
+refreshRecentChips();
+
+// ─────────────────────────────────────────
+//  LOGIN
+// ─────────────────────────────────────────
+async function login(name) {
+  name = name.trim();
+  if (!name) return;
+
+  const btn = document.getElementById('btnLogin');
+  const err = document.getElementById('loginError');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Connecting…';
+  err.style.display = 'none';
+
+  const { error } = await db.from('users').upsert({ name }, { onConflict: 'name' });
+  if (error) {
+    err.textContent = 'Could not connect. Check your Supabase config.';
+    err.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = "Let's go →";
+    return;
+  }
+
+  currentUser = name;
+  pushRecent(name);
+  document.getElementById('userLabel').textContent = name;
+  document.getElementById('loginScreen').classList.remove('active');
+  document.getElementById('appScreen').classList.add('active');
+  activeGenre = ''; showingMine = false;
+  document.getElementById('interestedFilter').classList.remove('active');
+  btn.disabled = false;
+  btn.textContent = "Let's go →";
+
+  await loadConcerts();
+  await loadAllInterests();
+  subscribeRealtime();
+}
+
+document.getElementById('btnLogin').onclick    = () => login(document.getElementById('nameInput').value);
+document.getElementById('nameInput').onkeydown = e => { if (e.key === 'Enter') login(e.target.value); };
+
+function logout() {
+  if (rtChannel) db.removeChannel(rtChannel);
+  currentUser = null; concerts = []; myInterests.clear(); allInterests = {};
+  filtersReady = false; showingMine = false; activeGenre = '';
+  document.getElementById('venueFilter').innerHTML = '<option value="">All Venues</option>';
+  document.getElementById('dateFilter').innerHTML  = '<option value="">All Dates</option>';
+  document.getElementById('genreFilter').innerHTML = '<option value="">All Genres</option>';
+  document.getElementById('interestedFilter').classList.remove('active');
+  document.getElementById('intBar').classList.remove('visible');
+  document.getElementById('nameInput').value = '';
+  document.getElementById('loginError').style.display = 'none';
+  document.getElementById('grid').innerHTML = '<div class="grid-loading"><span class="spinner light"></span>&nbsp; Loading concerts…</div>';
+  document.getElementById('appScreen').classList.remove('active');
+  document.getElementById('loginScreen').classList.add('active');
+  refreshRecentChips();
+}
+document.getElementById('btnLogout').onclick = logout;
+document.getElementById('homeLink').onclick  = logout;
+
+// ─────────────────────────────────────────
+//  SUPABASE DATA
+// ─────────────────────────────────────────
+async function loadConcerts() {
+  const { data, error } = await db.from('concerts').select('*').order('date');
+  if (error) { console.error('loadConcerts:', error); return; }
+  concerts = data || [];
+  populateFilters();
+  render();
+}
+
+async function loadAllInterests() {
+  const { data, error } = await db.from('interests').select('user_name, concert_id');
+  if (error) { console.error('loadAllInterests:', error); return; }
+  allInterests = {};
+  myInterests.clear();
+  (data || []).forEach(r => {
+    if (!allInterests[r.user_name]) allInterests[r.user_name] = new Set();
+    allInterests[r.user_name].add(r.concert_id);
+    if (r.user_name === currentUser) myInterests.add(r.concert_id);
+  });
+  render();
+}
+
+async function toggleInterest(concertId) {
+  const was = myInterests.has(concertId);
+  // Optimistic
+  was ? myInterests.delete(concertId) : myInterests.add(concertId);
+  if (!allInterests[currentUser]) allInterests[currentUser] = new Set();
+  was ? allInterests[currentUser].delete(concertId) : allInterests[currentUser].add(concertId);
+  render();
+
+  if (was) {
+    await db.from('interests').delete().eq('user_name', currentUser).eq('concert_id', concertId);
+  } else {
+    await db.from('interests').upsert({ user_name: currentUser, concert_id: concertId }, { onConflict: 'user_name,concert_id' });
+  }
+}
+
+// ─────────────────────────────────────────
+//  REALTIME
+// ─────────────────────────────────────────
+function subscribeRealtime() {
+  rtChannel = db.channel('rt-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'interests' }, loadAllInterests)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'concerts'  }, async () => {
+      filtersReady = false;
+      document.getElementById('venueFilter').innerHTML = '<option value="">All Venues</option>';
+      document.getElementById('dateFilter').innerHTML  = '<option value="">All Dates</option>';
+      document.getElementById('genreFilter').innerHTML = '<option value="">All Genres</option>';
+      await loadConcerts();
+    })
+    .subscribe();
+}
+
+// ─────────────────────────────────────────
+//  FILTERS
+// ─────────────────────────────────────────
+function dateLabel(d) {
+  try {
+    const p = d.split('/');
+    if (p.length === 2) return new Date(2025, +p[0]-1, +p[1]).toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+  } catch(e) {}
+  return d;
+}
+
+function populateFilters() {
+  if (filtersReady) return;
+  filtersReady = true;
+  const vf = document.getElementById('venueFilter');
+  const df = document.getElementById('dateFilter');
+  const gf = document.getElementById('genreFilter');
+  [...new Set(concerts.map(c => c.venue).filter(Boolean))].sort().forEach(v => vf.add(new Option(v, v)));
+  [...new Set(concerts.map(c => c.date))].sort().forEach(d => df.add(new Option(dateLabel(d), d)));
+  [...new Set(concerts.flatMap(c => c.genres||[]))].sort().forEach(g => gf.add(new Option(g, g)));
+  vf.onchange = render;
+  df.onchange = render;
+  gf.onchange = () => { activeGenre = ''; render(); };
+}
+
+// ─────────────────────────────────────────
+//  RENDER
+// ─────────────────────────────────────────
+function render() {
+  if (!currentUser) return;
+  const venue = document.getElementById('venueFilter').value;
+  const date  = document.getElementById('dateFilter').value;
+  const genre = document.getElementById('genreFilter').value || activeGenre;
+
+  const filtered = concerts.filter(c => {
+    if (venue && c.venue !== venue) return false;
+    if (date  && c.date  !== date)  return false;
+    if (genre && !(c.genres||[]).some(g => g.toLowerCase() === genre.toLowerCase())) return false;
+    if (showingMine && !myInterests.has(c.id)) return false;
+    return true;
+  });
+
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+
+  if (!filtered.length) {
+    grid.innerHTML = '<div class="empty">No concerts match your filters.</div>';
+  } else {
+    filtered.forEach(c => {
+      const isInt  = myInterests.has(c.id);
+      const others = Object.entries(allInterests)
+        .filter(([u, s]) => u !== currentUser && s.has(c.id))
+        .map(([u]) => u);
+      const avatars = [
+        ...(isInt ? [`<span class="avatar">${currentUser}</span>`] : []),
+        ...others.map(u => `<span class="avatar">${u}</span>`)
+      ].join('');
+
+      const card = document.createElement('div');
+      card.className = 'card' + (isInt ? ' is-interested' : '');
+      card.innerHTML = `
+        <div class="card-date">${dateLabel(c.date)}</div>
+        <div class="card-artist">${c.artist}</div>
+        <div class="card-venue">${c.venue||''}</div>
+        <div class="card-genres">${(c.genres||[]).map(g=>`<span class="genre-tag" data-genre="${g}">${g}</span>`).join('')}</div>
+        <div class="card-desc">${c.desc||''}</div>
+        <div class="card-interested-by">${avatars}</div>
+        <div class="card-footer">
+          <button class="btn-interested${isInt?' active':''}" data-id="${c.id}">${isInt?'★ Interested':'☆ Interested'}</button>
+        </div>`;
+      grid.appendChild(card);
+    });
+  }
+
+  document.getElementById('countBadge').textContent = `${filtered.length} show${filtered.length!==1?'s':''}`;
+  const sz = myInterests.size;
+  document.getElementById('intCount').textContent = sz;
+  document.getElementById('intBar').classList.toggle('visible', sz > 0);
+}
+
+document.getElementById('grid').addEventListener('click', e => {
+  if (!currentUser) return;
+  const btn = e.target.closest('.btn-interested');
+  const tag = e.target.closest('.genre-tag');
+  if (btn) toggleInterest(btn.dataset.id);
+  if (tag) {
+    activeGenre = activeGenre === tag.dataset.genre ? '' : tag.dataset.genre;
+    document.getElementById('genreFilter').value = '';
+    render();
+  }
+});
+
+document.getElementById('interestedFilter').onclick = () => {
+  showingMine = !showingMine;
+  document.getElementById('interestedFilter').classList.toggle('active', showingMine);
+  render();
+};
+
+// ─────────────────────────────────────────
+//  ADMIN PASSWORD GATE
+// ─────────────────────────────────────────
+document.getElementById('btnOpenAdmin').onclick = () => {
+  document.getElementById('adminOverlay').classList.add('open');
+  document.getElementById('adminPwInput').value = '';
+  document.getElementById('adminError').style.display = 'none';
+  setTimeout(() => document.getElementById('adminPwInput').focus(), 80);
+};
+document.getElementById('btnAdminCancel').onclick = () => {
+  document.getElementById('adminOverlay').classList.remove('open');
+};
+document.getElementById('adminPwInput').onkeydown = e => {
+  if (e.key === 'Enter') document.getElementById('btnAdminSubmit').click();
+};
+document.getElementById('btnAdminSubmit').onclick = () => {
+  const pw  = document.getElementById('adminPwInput').value;
+  const err = document.getElementById('adminError');
+  if (pw === ADMIN_PASSWORD) {
+    document.getElementById('adminOverlay').classList.remove('open');
+    openDash();
+  } else {
+    err.textContent = 'Incorrect password.';
+    err.style.display = 'block';
+    document.getElementById('adminPwInput').value = '';
+    document.getElementById('adminPwInput').focus();
+  }
+};
+
+// ─────────────────────────────────────────
+//  DASHBOARD
+// ─────────────────────────────────────────
+document.getElementById('btnCloseDash').onclick = () => document.getElementById('dashboard').classList.remove('open');
+
+async function openDash() {
+  document.getElementById('dashboard').classList.add('open');
+  await buildDash();
+}
+
+async function buildDash() {
+  const [{ data: iData }, { data: uData }, { data: cData }] = await Promise.all([
+    db.from('interests').select('user_name, concert_id'),
+    db.from('users').select('name').order('name'),
+    db.from('concerts').select('*').order('date')
+  ]);
+
+  const allUsers  = (uData||[]).map(u => u.name);
+  const showList  = cData || [];
+  const intMap    = {};
+  (iData||[]).forEach(r => {
+    if (!intMap[r.user_name]) intMap[r.user_name] = new Set();
+    intMap[r.user_name].add(r.concert_id);
+  });
+
+  // ── By Person ──
+  const byPerson = document.getElementById('byPersonPanel');
+  byPerson.innerHTML = '';
+  if (!allUsers.length) {
+    byPerson.innerHTML = '<div style="padding:1.5rem;font-size:0.72rem;color:var(--muted);background:var(--card);">No users yet.</div>';
+  } else {
+    allUsers.forEach(u => {
+      const shows = showList.filter(c => (intMap[u]||new Set()).has(c.id));
+      const card  = document.createElement('div');
+      card.className = 'user-card';
+      card.innerHTML = `<div class="user-card-name">${u}</div>
+        <div class="user-show-list">${shows.length
+          ? shows.map(c=>`<div class="user-show-item"><strong>${c.artist}</strong><span>${c.date} · ${c.venue}</span></div>`).join('')
+          : '<div class="none-label">No shows marked yet</div>'}</div>`;
+      byPerson.appendChild(card);
+    });
+  }
+
+  // ── By Show ──
+  const byShow = document.getElementById('byShowPanel');
+  byShow.innerHTML = '';
+  showList.forEach(c => {
+    const intBy = allUsers.filter(u => (intMap[u]||new Set()).has(c.id));
+    const row   = document.createElement('div');
+    row.className = 'show-interest-row';
+    row.innerHTML = `
+      <div class="show-interest-info">
+        <div class="show-interest-artist">${c.artist}</div>
+        <div class="show-interest-meta">${c.date} · ${c.venue}</div>
+      </div>
+      <div class="show-interest-names">${intBy.length
+        ? intBy.map(u=>`<span class="avatar">${u}</span>`).join('')
+        : '<span class="no-interest">No interest yet</span>'}</div>`;
+    byShow.appendChild(row);
+  });
+
+  // ── Manage Events ──
+  const mgmt = document.getElementById('managePanel');
+  mgmt.innerHTML = '';
+  if (!showList.length) {
+    mgmt.innerHTML = '<div style="padding:1.5rem;font-size:0.72rem;color:var(--muted);background:var(--card);">No events in database.</div>';
+  } else {
+    showList.forEach(c => {
+      const row = document.createElement('div');
+      row.className = 'show-interest-row';
+      row.innerHTML = `
+        <div class="show-interest-info">
+          <div class="show-interest-artist">${c.artist}</div>
+          <div class="show-interest-meta">${c.date} · ${c.venue}</div>
+        </div>
+        <button class="btn-delete" data-id="${c.id}">Delete</button>`;
+      mgmt.appendChild(row);
+    });
+  }
+
+  // ── Copy buttons ──
+  document.getElementById('copyByPerson').onclick = function() {
+    const text = allUsers.map(u => {
+      const shows = showList.filter(c => (intMap[u]||new Set()).has(c.id));
+      return `${u}:\n${shows.length ? shows.map(c=>`  • ${c.artist} (${c.date}, ${c.venue})`).join('\n') : '  (none)'}`;
+    }).join('\n\n');
+    navigator.clipboard.writeText(text).then(() => {
+      this.textContent='Copied!'; this.classList.add('copied');
+      setTimeout(()=>{ this.textContent='Copy as text'; this.classList.remove('copied'); }, 2000);
+    });
+  };
+  document.getElementById('copyByShow').onclick = function() {
+    const text = showList.map(c => {
+      const intBy = allUsers.filter(u => (intMap[u]||new Set()).has(c.id));
+      return `${c.artist} (${c.date}, ${c.venue}):\n  ${intBy.length ? intBy.join(', ') : 'No interest yet'}`;
+    }).join('\n\n');
+    navigator.clipboard.writeText(text).then(() => {
+      this.textContent='Copied!'; this.classList.add('copied');
+      setTimeout(()=>{ this.textContent='Copy as text'; this.classList.remove('copied'); }, 2000);
+    });
+  };
+}
+
+// Delete event handler
+document.getElementById('managePanel').addEventListener('click', async e => {
+  const btn = e.target.closest('.btn-delete');
+  if (!btn) return;
+  if (!confirm('Delete this event? This will also remove all interest entries for it.')) return;
+  btn.textContent = '…'; btn.disabled = true;
+  await db.from('interests').delete().eq('concert_id', btn.dataset.id);
+  await db.from('concerts').delete().eq('id', btn.dataset.id);
+  await buildDash();
+});
+
+// ─────────────────────────────────────────
+//  CSV IMPORT
+// ─────────────────────────────────────────
+let csvRows = [];
+
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/^"|"$/g,''));
+  return lines.slice(1).map(line => {
+    const cols = []; let cur = '', inQ = false;
+    for (const ch of line) {
+      if (ch === '"') inQ = !inQ;
+      else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else cur += ch;
+    }
+    cols.push(cur.trim());
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (cols[i]||'').replace(/^"|"$/g,'').trim(); });
+    return obj;
+  }).filter(r => r.artist && r.date);
+}
+
+const csvZone    = document.getElementById('csvZone');
+const csvFileEl  = document.getElementById('csvFile');
+const csvPreview = document.getElementById('csvPreview');
+const csvActions = document.getElementById('csvActions');
+const csvMsg     = document.getElementById('csvMsg');
+const btnImport  = document.getElementById('btnImport');
+
+csvZone.addEventListener('dragover',  e => { e.preventDefault(); csvZone.classList.add('over'); });
+csvZone.addEventListener('dragleave', () => csvZone.classList.remove('over'));
+csvZone.addEventListener('drop', e => {
+  e.preventDefault(); csvZone.classList.remove('over');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+csvFileEl.addEventListener('change', () => { if (csvFileEl.files[0]) handleFile(csvFileEl.files[0]); });
+
+function handleFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    csvRows = parseCSV(e.target.result);
+    csvMsg.textContent = ''; csvMsg.className = 'csv-msg';
+    if (!csvRows.length) {
+      csvPreview.style.display = 'none';
+      csvActions.style.display = 'flex';
+      csvMsg.textContent = 'No valid rows found. Check column headers.';
+      csvMsg.className   = 'csv-msg err';
+      btnImport.disabled = true;
+      return;
+    }
+    csvPreview.style.display = 'block';
+    csvActions.style.display = 'flex';
+    btnImport.disabled = false;
+    csvPreview.innerHTML =
+      `<div style="font-size:0.62rem;color:var(--muted);margin-bottom:0.5rem;letter-spacing:0.1em;">${csvRows.length} ROW${csvRows.length!==1?'S':''} DETECTED — PREVIEW</div>` +
+      csvRows.map(r => `<div class="csv-row">
+        <strong>${r.artist}</strong>
+        <span>${r.date}</span>
+        <span>${r.venue||'—'}</span>
+        <span style="flex:1;color:#555;">${r.desc ? r.desc.slice(0,55)+'…' : ''}</span>
+      </div>`).join('');
+  };
+  reader.readAsText(file);
+}
+
+btnImport.addEventListener('click', async () => {
+  if (!csvRows.length) return;
+  btnImport.disabled = true;
+  btnImport.innerHTML = '<span class="spinner"></span> Importing…';
+  csvMsg.textContent = ''; csvMsg.className = 'csv-msg';
+
+  const { data: existing } = await db.from('concerts').select('artist, date');
+  const existSet = new Set((existing||[]).map(c => `${c.artist}|||${c.date}`));
+
+  const toInsert = csvRows
+    .filter(r => !existSet.has(`${r.artist}|||${r.date}`))
+    .map(r => ({
+      date:   r.date,
+      venue:  r.venue  || '',
+      artist: r.artist,
+      desc:   r.desc   || '',
+      genres: r.genres ? r.genres.split('|').map(g=>g.trim()).filter(Boolean) : [],
+      link:   r.link   || ''
+    }));
+
+  const skipped = csvRows.length - toInsert.length;
+
+  if (toInsert.length) {
+    const { error } = await db.from('concerts').insert(toInsert);
+    if (error) {
+      csvMsg.textContent = `Error: ${error.message}`;
+      csvMsg.className   = 'csv-msg err';
+      btnImport.textContent = 'Import Events';
+      btnImport.disabled = false;
+      return;
+    }
+  }
+
+  csvMsg.textContent = `✓ Added ${toInsert.length} event${toInsert.length!==1?'s':''}${skipped?`, skipped ${skipped} duplicate${skipped!==1?'s':''}`:''}.`;
+  csvMsg.className   = 'csv-msg ok';
+  btnImport.textContent = 'Import Events';
+  btnImport.disabled = true;
+  await buildDash();
+});
+
+document.getElementById('btnCsvClear').addEventListener('click', () => {
+  csvRows = [];
+  csvPreview.style.display = 'none';
+  csvActions.style.display = 'none';
+  csvMsg.textContent = '';
+  csvFileEl.value = '';
+  btnImport.disabled = true;
+});
+</script>
+</body>
+</html>
