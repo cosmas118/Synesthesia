@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Synesthesia</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black: #0a0a0a;
+      --white: #f0ece3;
+      --accent: #e8c547;
+      --accent2: #e85d47;
+      --glass: rgba(10,10,10,0.72);
+      --glass-border: rgba(232,197,71,0.18);
+      --radius: 2px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--black);
+      color: var(--white);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── BACKGROUND ── */
+    #bg {
+      position: fixed; inset: 0; z-index: 0;
+      background: #0a0a0a url('') center/cover no-repeat;
+    }
+    #bg::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.82) 60%, rgba(10,10,10,0.97) 100%);
+    }
+
+    /* Animated grain overlay */
+    #grain {
+      position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.04;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    }
+
+    /* ── LAYOUT ── */
+    #app { position: relative; z-index: 2; min-height: 100vh; }
+
+    /* ── HEADER ── */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 28px 40px 20px;
+      border-bottom: 1px solid rgba(232,197,71,0.12);
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(10,10,10,0.88);
+      backdrop-filter: blur(12px);
+    }
+
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(2.2rem, 5vw, 3.8rem);
+      letter-spacing: 0.12em;
+      color: var(--white);
+      text-transform: uppercase;
+      line-height: 1;
+    }
+    .logo span { color: var(--accent); }
+
+    .header-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+    .tag-pill {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 5px 12px;
+      border: 1px solid var(--glass-border);
+      color: rgba(240,236,227,0.55);
+      border-radius: 40px;
+    }
+
+    /* ── BUTTONS ── */
+    .btn {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 9px 20px;
+      border: 1px solid var(--accent);
+      background: transparent;
+      color: var(--accent);
+      cursor: pointer;
+      transition: all 0.2s;
+      border-radius: var(--radius);
+    }
+    .btn:hover { background: var(--accent); color: var(--black); }
+    .btn.solid { background: var(--accent); color: var(--black); }
+    .btn.solid:hover { background: #f0d45a; }
+    .btn.danger { border-color: var(--accent2); color: var(--accent2); }
+    .btn.danger:hover { background: var(--accent2); color: var(--white); }
+    .btn.sm { padding: 6px 14px; font-size: 0.62rem; }
+
+    /* ── USER BAR ── */
+    #user-bar {
+      display: flex; align-items: center; gap: 10px;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+    }
+    #user-name-display {
+      color: var(--accent);
+      letter-spacing: 0.08em;
+    }
+
+    /* ── MODALS ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.8); backdrop-filter: blur(6px);
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: #111;
+      border: 1px solid var(--glass-border);
+      padding: 40px;
+      width: min(460px, 92vw);
+      border-radius: 4px;
+      animation: fadeUp 0.25s ease;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .modal h2 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 2rem;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+    .modal p.sub {
+      font-size: 0.78rem;
+      color: rgba(240,236,227,0.45);
+      margin-bottom: 28px;
+      font-family: 'Space Mono', monospace;
+    }
+
+    .field { margin-bottom: 18px; }
+    .field label {
+      display: block;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(240,236,227,0.5);
+      margin-bottom: 7px;
+    }
+    .field input, .field select {
+      width: 100%;
+      background: #1a1a1a;
+      border: 1px solid rgba(240,236,227,0.12);
+      color: var(--white);
+      padding: 10px 14px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      border-radius: var(--radius);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .field input:focus, .field select:focus {
+      border-color: var(--accent);
+    }
+
+    .modal-actions { display: flex; gap: 12px; margin-top: 24px; justify-content: flex-end; }
+    .modal-error {
+      font-size: 0.75rem;
+      color: var(--accent2);
+      font-family: 'Space Mono', monospace;
+      margin-top: 8px;
+      min-height: 18px;
+    }
+
+    /* ── MAIN CONTENT ── */
+    main { padding: 40px; max-width: 1400px; margin: 0 auto; }
+
+    /* ── TOOLBAR ── */
+    #toolbar {
+      display: flex; align-items: center; gap: 14px;
+      margin-bottom: 36px; flex-wrap: wrap;
+    }
+
+    .section-label {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.1rem;
+      letter-spacing: 0.15em;
+      color: rgba(240,236,227,0.3);
+      text-transform: uppercase;
+    }
+
+    .filter-group { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+
+    .filter-pill {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 6px 14px;
+      border: 1px solid rgba(240,236,227,0.18);
+      background: transparent;
+      color: rgba(240,236,227,0.5);
+      cursor: pointer;
+      border-radius: 40px;
+      transition: all 0.18s;
+    }
+    .filter-pill:hover, .filter-pill.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(232,197,71,0.07);
+    }
+
+    /* ── CONCERT GRID ── */
+    #concert-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
+    }
+
+    /* ── CONCERT CARD ── */
+    .concert-card {
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: 3px;
+      padding: 26px 26px 22px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.22s, border-color 0.22s, box-shadow 0.22s;
+      cursor: default;
+    }
+    .concert-card::before {
+      content: '';
+      position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+      background: var(--accent);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .concert-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(232,197,71,0.4);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    }
+    .concert-card:hover::before { opacity: 1; }
+    .concert-card.interested {
+      border-color: rgba(232,197,71,0.55);
+    }
+    .concert-card.interested::before { opacity: 1; }
+
+    .card-date {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+
+    .card-artist {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.65rem;
+      letter-spacing: 0.04em;
+      line-height: 1.1;
+      color: var(--white);
+      margin-bottom: 6px;
+    }
+
+    .card-venue {
+      font-size: 0.78rem;
+      color: rgba(240,236,227,0.45);
+      font-family: 'Space Mono', monospace;
+      margin-bottom: 14px;
+      letter-spacing: 0.04em;
+    }
+
+    .card-genres {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      margin-bottom: 14px;
+    }
+    .genre-tag {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.55rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border: 1px solid rgba(240,236,227,0.15);
+      color: rgba(240,236,227,0.4);
+      border-radius: 40px;
+    }
+
+    .card-desc {
+      font-size: 0.82rem;
+      color: rgba(240,236,227,0.6);
+      line-height: 1.65;
+      margin-bottom: 20px;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .card-footer {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+
+    .interest-btn {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 7px 16px;
+      border: 1px solid rgba(240,236,227,0.2);
+      background: transparent;
+      color: rgba(240,236,227,0.45);
+      cursor: pointer;
+      transition: all 0.2s;
+      border-radius: var(--radius);
+    }
+    .interest-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .interest-btn.on {
+      border-color: var(--accent);
+      color: var(--black);
+      background: var(--accent);
+    }
+    .interest-btn.on:hover {
+      background: transparent;
+      color: var(--accent);
+    }
+
+    .ticket-link {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(240,236,227,0.3);
+      text-decoration: none;
+      transition: color 0.18s;
+    }
+    .ticket-link:hover { color: var(--accent); }
+
+    /* ── EMPTY STATE ── */
+    #empty-state {
+      display: none;
+      text-align: center;
+      padding: 80px 20px;
+      font-family: 'Space Mono', monospace;
+      color: rgba(240,236,227,0.25);
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+    }
+    #empty-state .big {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 3rem;
+      display: block;
+      margin-bottom: 10px;
+      color: rgba(240,236,227,0.15);
+    }
+
+    /* ── LOADING ── */
+    #loading {
+      display: none;
+      text-align: center; padding: 60px;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.14em;
+      color: rgba(240,236,227,0.3);
+      text-transform: uppercase;
+    }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed; bottom: 30px; right: 30px; z-index: 500;
+      background: var(--accent);
+      color: var(--black);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 12px 22px;
+      border-radius: var(--radius);
+      transform: translateY(20px);
+      opacity: 0;
+      transition: all 0.25s;
+      pointer-events: none;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.error { background: var(--accent2); color: var(--white); }
+
+    /* ── ADMIN PANEL ── */
+    #admin-panel {
+      display: none;
+      position: fixed; inset: 0; z-index: 300;
+      background: #0d0d0d;
+      overflow-y: auto;
+    }
+    #admin-panel.open { display: block; }
+
+    .admin-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 24px 40px;
+      border-bottom: 1px solid rgba(232,197,71,0.15);
+      position: sticky; top: 0; background: #0d0d0d; z-index: 10;
+    }
+    .admin-header h1 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.8rem;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+    }
+
+    .admin-body { padding: 40px; max-width: 1200px; margin: 0 auto; }
+
+    .admin-section {
+      background: #111;
+      border: 1px solid rgba(232,197,71,0.1);
+      border-radius: 4px;
+      padding: 30px;
+      margin-bottom: 30px;
+    }
+    .admin-section h2 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.4rem;
+      letter-spacing: 0.1em;
+      color: var(--white);
+      margin-bottom: 20px;
+    }
+
+    /* Upload drop zone */
+    #drop-zone {
+      border: 2px dashed rgba(232,197,71,0.25);
+      border-radius: 4px;
+      padding: 50px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: 'Space Mono', monospace;
+      color: rgba(240,236,227,0.35);
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+    }
+    #drop-zone:hover, #drop-zone.dragover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(232,197,71,0.04);
+    }
+    #drop-zone .drop-icon { font-size: 2.5rem; display: block; margin-bottom: 12px; }
+    #csv-file-input { display: none; }
+
+    /* Users table */
+    .admin-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+    .admin-table th {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(240,236,227,0.35);
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid rgba(240,236,227,0.08);
+    }
+    .admin-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(240,236,227,0.05);
+      color: rgba(240,236,227,0.75);
+      vertical-align: top;
+    }
+    .admin-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .admin-table .genres-cell {
+      font-size: 0.72rem;
+      color: rgba(240,236,227,0.4);
+    }
+
+    /* Create user */
+    .create-user-form { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+    .create-user-form .field { margin-bottom: 0; flex: 1; min-width: 200px; }
+
+    /* ── FILTER SHOW INTERESTED ── */
+    #show-interested-btn.active {
+      background: rgba(232,197,71,0.15);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(232,197,71,0.2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(232,197,71,0.4); }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      header { padding: 18px 20px; }
+      main { padding: 24px 18px; }
+      .admin-body { padding: 20px; }
+      .admin-header { padding: 18px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="bg"></div>
+<div id="grain"></div>
+
+<div id="app">
+
+  <!-- ══ HEADER ══ -->
+  <header>
+    <div class="logo">Synes<span>thesia</span></div>
+    <div class="header-right">
+      <span class="tag-pill">Chapel Hill · Live Music</span>
+      <div id="user-bar">
+        <span id="user-name-display" style="display:none"></span>
+        <button class="btn sm" id="login-btn" onclick="openLoginModal()">Sign In</button>
+        <button class="btn sm" id="logout-btn" style="display:none" onclick="logout()">Sign Out</button>
+        <button class="btn sm" id="admin-open-btn" style="display:none" onclick="openAdminPanel()">Admin</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══ MAIN ══ -->
+  <main>
+    <div id="toolbar">
+      <span class="section-label">Upcoming Shows</span>
+      <button class="filter-pill" id="show-interested-btn" onclick="toggleInterestedFilter()" style="display:none">★ My List</button>
+      <div class="filter-group" id="genre-filters"></div>
+    </div>
+
+    <div id="loading">Loading shows…</div>
+    <div id="concert-grid"></div>
+    <div id="empty-state"><span class="big">No Shows Found</span>Try adjusting your filters</div>
+  </main>
+
+</div>
+
+<!-- ══ LOGIN MODAL ══ -->
+<div class="modal-overlay" id="login-modal">
+  <div class="modal">
+    <h2>Sign In</h2>
+    <p class="sub">Enter your username and password to continue</p>
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="login-username" placeholder="your name" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="••••••••" />
+    </div>
+    <div class="modal-error" id="login-error"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeLoginModal()">Cancel</button>
+      <button class="btn solid" onclick="doLogin()">Sign In</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ADMIN LOGIN MODAL ══ -->
+<div class="modal-overlay" id="admin-login-modal">
+  <div class="modal">
+    <h2>Admin Access</h2>
+    <p class="sub">Enter admin credentials</p>
+    <div class="field">
+      <label>Admin Password</label>
+      <input type="password" id="admin-password-input" placeholder="••••••••" onkeydown="if(event.key==='Enter') doAdminLogin()" />
+    </div>
+    <div class="modal-error" id="admin-login-error"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeAdminLoginModal()">Cancel</button>
+      <button class="btn solid" onclick="doAdminLogin()">Enter</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ADMIN PANEL ══ -->
+<div id="admin-panel">
+  <div class="admin-header">
+    <h1>⚡ Synesthesia Admin</h1>
+    <button class="btn danger" onclick="closeAdminPanel()">✕ Close</button>
+  </div>
+  <div class="admin-body">
+
+    <!-- Upload CSV -->
+    <div class="admin-section">
+      <h2>Upload Concert CSV</h2>
+      <div id="drop-zone" onclick="document.getElementById('csv-file-input').click()"
+           ondragover="event.preventDefault(); this.classList.add('dragover')"
+           ondragleave="this.classList.remove('dragover')"
+           ondrop="handleDrop(event)">
+        <span class="drop-icon">📂</span>
+        Drop CSV here or click to browse<br>
+        <span style="font-size:0.6rem; opacity:0.5; margin-top:6px; display:inline-block">Columns: date, venue, artist, desc, genres, link</span>
+      </div>
+      <input type="file" id="csv-file-input" accept=".csv" onchange="handleFileSelect(event)" />
+      <div id="upload-status" style="margin-top:14px; font-family:'Space Mono',monospace; font-size:0.72rem; color:rgba(240,236,227,0.45);"></div>
+    </div>
+
+    <!-- Create User -->
+    <div class="admin-section">
+      <h2>Create User</h2>
+      <div class="create-user-form">
+        <div class="field">
+          <label>Username</label>
+          <input type="text" id="new-username" placeholder="e.g. sarah" />
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="new-user-password" placeholder="••••••••" />
+        </div>
+        <button class="btn solid" onclick="createUser()">Create User</button>
+      </div>
+      <div id="create-user-status" style="margin-top:12px; font-family:'Space Mono',monospace; font-size:0.72rem; color:rgba(240,236,227,0.45);"></div>
+    </div>
+
+    <!-- Users & Interests -->
+    <div class="admin-section">
+      <h2>User Interest Report</h2>
+      <button class="btn sm" onclick="loadAdminReport()" style="margin-bottom:18px">Refresh Report</button>
+      <div id="admin-report">
+        <p style="font-family:'Space Mono',monospace; font-size:0.72rem; color:rgba(240,236,227,0.3);">Click Refresh to load.</p>
+      </div>
+    </div>
+
+    <!-- Manage Concerts -->
+    <div class="admin-section">
+      <h2>All Concerts</h2>
+      <button class="btn sm danger" onclick="clearAllConcerts()" style="margin-bottom:18px">Clear All Concerts</button>
+      <div id="admin-concerts-list">
+        <p style="font-family:'Space Mono',monospace; font-size:0.72rem; color:rgba(240,236,227,0.3);">Open admin panel to see concerts.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ TOAST ══ -->
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════
+//  CONFIG — fill in your Supabase credentials
+// ══════════════════════════════════════════════
+const SUPABASE_URL = 'https://onskirzxrhwsmqihfvdl.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uc2tpcnp4cmh3c21xaWhmdmRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4Nzc4MTQsImV4cCI6MjA4NzQ1MzgxNH0.YFCVqyeFlMLhcl2znrxW714EpBDi_di0CNXXnK5HT_E';
+
+// Admin password (stored only here, never in Supabase)
+const ADMIN_PASSWORD = 'Cosmas121*';
+
+// ── Init Supabase ──
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+let currentUser = null; // { name, password_hash }
+let allConcerts = [];
+let userInterests = new Set(); // concert ids
+let activeGenreFilter = null;
+let showOnlyInterested = false;
+
+// ══════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (isError ? ' error' : '');
+  setTimeout(() => { t.className = ''; }, 3000);
+}
+
+// Simple hash (not cryptographic, but functional for this use case)
+async function hashPassword(pw) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+// ══════════════════════════════════════════════
+//  AUTH — LOGIN / LOGOUT
+// ══════════════════════════════════════════════
+function openLoginModal() {
+  document.getElementById('login-modal').classList.add('open');
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-password').value = '';
+  setTimeout(() => document.getElementById('login-username').focus(), 50);
+}
+function closeLoginModal() {
+  document.getElementById('login-modal').classList.remove('open');
+}
+
+document.getElementById('login-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+async function doLogin() {
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  if (!username || !password) {
+    document.getElementById('login-error').textContent = 'Please enter username and password.';
+    return;
+  }
+  const hash = await hashPassword(password);
+
+  // Fetch user from DB
+  const { data, error } = await sb
+    .from('users')
+    .select('name, password_hash')
+    .eq('name', username)
+    .single();
+
+  if (error || !data) {
+    document.getElementById('login-error').textContent = 'User not found.';
+    return;
+  }
+  if (data.password_hash !== hash) {
+    document.getElementById('login-error').textContent = 'Incorrect password.';
+    return;
+  }
+
+  currentUser = data;
+  closeLoginModal();
+  await onUserLoggedIn();
+}
+
+async function onUserLoggedIn() {
+  document.getElementById('login-btn').style.display = 'none';
+  document.getElementById('logout-btn').style.display = '';
+  document.getElementById('user-name-display').style.display = '';
+  document.getElementById('user-name-display').textContent = currentUser.name;
+  document.getElementById('show-interested-btn').style.display = '';
+
+  // Load interests
+  const { data } = await sb
+    .from('interests')
+    .select('concert_id')
+    .eq('user_name', currentUser.name);
+  userInterests = new Set((data || []).map(r => r.concert_id));
+
+  renderConcerts();
+  showToast('Welcome back, ' + currentUser.name + '!');
+}
+
+function logout() {
+  currentUser = null;
+  userInterests = new Set();
+  showOnlyInterested = false;
+  document.getElementById('login-btn').style.display = '';
+  document.getElementById('logout-btn').style.display = 'none';
+  document.getElementById('admin-open-btn').style.display = 'none';
+  document.getElementById('user-name-display').style.display = 'none';
+  document.getElementById('show-interested-btn').style.display = 'none';
+  document.getElementById('show-interested-btn').classList.remove('active');
+  renderConcerts();
+  showToast('Signed out.');
+}
+
+// ══════════════════════════════════════════════
+//  ADMIN AUTH
+// ══════════════════════════════════════════════
+function openAdminPanel() {
+  document.getElementById('admin-panel').classList.add('open');
+  loadAdminConcerts();
+}
+function closeAdminPanel() {
+  document.getElementById('admin-panel').classList.remove('open');
+}
+
+// Admin login via header button (hidden; access by navigating to #admin in URL or via ?admin)
+function checkAdminAccess() {
+  if (window.location.hash === '#admin' || new URLSearchParams(window.location.search).has('admin')) {
+    document.getElementById('admin-open-btn').style.display = '';
+  }
+}
+
+function openAdminLoginModal() {
+  document.getElementById('admin-login-modal').classList.add('open');
+  document.getElementById('admin-login-error').textContent = '';
+  document.getElementById('admin-password-input').value = '';
+  setTimeout(() => document.getElementById('admin-password-input').focus(), 50);
+}
+function closeAdminLoginModal() {
+  document.getElementById('admin-login-modal').classList.remove('open');
+}
+function doAdminLogin() {
+  const pw = document.getElementById('admin-password-input').value;
+  if (pw === ADMIN_PASSWORD) {
+    closeAdminLoginModal();
+    document.getElementById('admin-open-btn').style.display = '';
+    openAdminPanel();
+    showToast('Admin access granted.');
+  } else {
+    document.getElementById('admin-login-error').textContent = 'Incorrect password.';
+  }
+}
+
+// Secret: click logo 5 times fast to open admin login
+let logoClicks = 0, logoTimer;
+document.querySelector('.logo').addEventListener('click', () => {
+  logoClicks++;
+  clearTimeout(logoTimer);
+  logoTimer = setTimeout(() => logoClicks = 0, 2000);
+  if (logoClicks >= 5) { logoClicks = 0; openAdminLoginModal(); }
+});
+
+// ══════════════════════════════════════════════
+//  LOAD CONCERTS
+// ══════════════════════════════════════════════
+async function loadConcerts() {
+  document.getElementById('loading').style.display = 'block';
+  const { data, error } = await sb
+    .from('concerts')
+    .select('*')
+    .order('created_at', { ascending: true });
+
+  document.getElementById('loading').style.display = 'none';
+  if (error) { showToast('Error loading concerts', true); return; }
+  allConcerts = data || [];
+  buildGenreFilters();
+  renderConcerts();
+}
+
+function buildGenreFilters() {
+  const genreSet = new Set();
+  allConcerts.forEach(c => {
+    if (Array.isArray(c.genres)) c.genres.forEach(g => genreSet.add(g));
+  });
+
+  // Pick top genres by frequency
+  const freq = {};
+  allConcerts.forEach(c => {
+    if (Array.isArray(c.genres)) c.genres.forEach(g => { freq[g] = (freq[g]||0)+1; });
+  });
+  const top = [...genreSet].sort((a,b) => (freq[b]||0)-(freq[a]||0)).slice(0, 8);
+
+  const container = document.getElementById('genre-filters');
+  container.innerHTML = '';
+  top.forEach(g => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-pill';
+    btn.textContent = g;
+    btn.onclick = () => toggleGenreFilter(g, btn);
+    container.appendChild(btn);
+  });
+}
+
+function toggleGenreFilter(genre, btn) {
+  if (activeGenreFilter === genre) {
+    activeGenreFilter = null;
+    btn.classList.remove('active');
+  } else {
+    activeGenreFilter = genre;
+    document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  renderConcerts();
+}
+
+function toggleInterestedFilter() {
+  if (!currentUser) { openLoginModal(); return; }
+  showOnlyInterested = !showOnlyInterested;
+  document.getElementById('show-interested-btn').classList.toggle('active', showOnlyInterested);
+  renderConcerts();
+}
+
+function renderConcerts() {
+  let concerts = [...allConcerts];
+  if (activeGenreFilter) {
+    concerts = concerts.filter(c => Array.isArray(c.genres) && c.genres.includes(activeGenreFilter));
+  }
+  if (showOnlyInterested) {
+    concerts = concerts.filter(c => userInterests.has(c.id));
+  }
+
+  const grid = document.getElementById('concert-grid');
+  const empty = document.getElementById('empty-state');
+  grid.innerHTML = '';
+
+  if (concerts.length === 0) {
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  concerts.forEach(c => {
+    const isInterested = userInterests.has(c.id);
+    const genres = Array.isArray(c.genres) ? c.genres : [];
+    const genreTags = genres.map(g => `<span class="genre-tag">${g}</span>`).join('');
+    const card = document.createElement('div');
+    card.className = 'concert-card' + (isInterested ? ' interested' : '');
+    card.dataset.id = c.id;
+
+    const interestLabel = isInterested ? '★ Interested' : '☆ Add to List';
+
+    card.innerHTML = `
+      <div class="card-date">${c.date || ''}</div>
+      <div class="card-artist">${c.artist || ''}</div>
+      <div class="card-venue">${c.venue || ''}</div>
+      <div class="card-genres">${genreTags}</div>
+      <div class="card-desc">${c.descp || ''}</div>
+      <div class="card-footer">
+        <button class="interest-btn ${isInterested ? 'on' : ''}" data-id="${c.id}" onclick="toggleInterest('${c.id}', this)">
+          ${interestLabel}
+        </button>
+        ${c.link ? `<a class="ticket-link" href="${c.link}" target="_blank" rel="noopener">Tickets →</a>` : ''}
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// ══════════════════════════════════════════════
+//  INTERESTS
+// ══════════════════════════════════════════════
+async function toggleInterest(concertId, btn) {
+  if (!currentUser) { openLoginModal(); return; }
+
+  const card = btn.closest('.concert-card');
+  if (userInterests.has(concertId)) {
+    // Remove interest
+    await sb.from('interests').delete()
+      .eq('user_name', currentUser.name)
+      .eq('concert_id', concertId);
+    userInterests.delete(concertId);
+    btn.classList.remove('on');
+    btn.textContent = '☆ Add to List';
+    card.classList.remove('interested');
+  } else {
+    // Add interest
+    await sb.from('interests').insert({ user_name: currentUser.name, concert_id: concertId });
+    userInterests.add(concertId);
+    btn.classList.add('on');
+    btn.textContent = '★ Interested';
+    card.classList.add('interested');
+  }
+
+  if (showOnlyInterested) renderConcerts();
+}
+
+// ══════════════════════════════════════════════
+//  CSV UPLOAD
+// ══════════════════════════════════════════════
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) processCSV(file);
+}
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (file) processCSV(file);
+}
+
+function processCSV(file) {
+  const status = document.getElementById('upload-status');
+  status.textContent = 'Parsing CSV…';
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: async (results) => {
+      const rows = results.data;
+      status.textContent = `Parsed ${rows.length} rows. Uploading…`;
+
+      const records = rows.map(r => ({
+        date: r.date || '',
+        venue: r.venue || '',
+        artist: r.artist || '',
+        descp: r.desc || '',    // CSV column is "desc", DB column is "descp"
+        genres: r.genres
+          ? r.genres.split('|').map(g => g.trim()).filter(Boolean)
+          : [],
+        link: r.link || ''
+      }));
+
+      const { error } = await sb.from('concerts').insert(records);
+      if (error) {
+        status.textContent = '✗ Upload failed: ' + error.message;
+        showToast('Upload failed', true);
+      } else {
+        status.textContent = `✓ Uploaded ${records.length} concerts successfully.`;
+        showToast(`${records.length} concerts uploaded!`);
+        await loadConcerts();
+        await loadAdminConcerts();
+      }
+    },
+    error: (err) => {
+      status.textContent = '✗ CSV parse error: ' + err.message;
+    }
+  });
+}
+
+// ══════════════════════════════════════════════
+//  ADMIN — CREATE USER
+// ══════════════════════════════════════════════
+async function createUser() {
+  const name = document.getElementById('new-username').value.trim();
+  const password = document.getElementById('new-user-password').value;
+  const statusEl = document.getElementById('create-user-status');
+
+  if (!name || !password) {
+    statusEl.textContent = '✗ Please enter a username and password.';
+    return;
+  }
+
+  const password_hash = await hashPassword(password);
+  const { error } = await sb.from('users').insert({ name, password_hash });
+
+  if (error) {
+    statusEl.textContent = '✗ Error: ' + (error.message.includes('duplicate') ? 'Username already exists.' : error.message);
+  } else {
+    statusEl.textContent = `✓ User "${name}" created.`;
+    document.getElementById('new-username').value = '';
+    document.getElementById('new-user-password').value = '';
+    showToast('User created: ' + name);
+  }
+}
+
+// ══════════════════════════════════════════════
+//  ADMIN — REPORT
+// ══════════════════════════════════════════════
+async function loadAdminReport() {
+  const container = document.getElementById('admin-report');
+  container.innerHTML = '<p style="font-family:\'Space Mono\',monospace; font-size:0.72rem; color:rgba(240,236,227,0.3);">Loading…</p>';
+
+  const { data: users } = await sb.from('users').select('name');
+  const { data: interests } = await sb.from('interests').select('user_name, concert_id');
+  const { data: concerts } = await sb.from('concerts').select('id, artist, date, venue');
+
+  if (!users || !interests || !concerts) {
+    container.innerHTML = '<p style="color:var(--accent2); font-size:0.75rem; font-family:\'Space Mono\',monospace;">Error loading data.</p>';
+    return;
+  }
+
+  const concertMap = {};
+  concerts.forEach(c => concertMap[c.id] = c);
+
+  const userMap = {};
+  users.forEach(u => userMap[u.name] = []);
+  interests.forEach(i => {
+    if (!userMap[i.user_name]) userMap[i.user_name] = [];
+    userMap[i.user_name].push(i.concert_id);
+  });
+
+  let html = '<table class="admin-table"><thead><tr><th>User</th><th>Interested In</th></tr></thead><tbody>';
+  Object.entries(userMap).forEach(([name, concertIds]) => {
+    const shows = concertIds.map(id => {
+      const c = concertMap[id];
+      return c ? `${c.artist} (${c.date})` : id;
+    }).join(', ') || '<em style="opacity:0.4">None yet</em>';
+    html += `<tr><td><strong>${name}</strong></td><td class="genres-cell">${shows}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════
+//  ADMIN — CONCERTS LIST
+// ══════════════════════════════════════════════
+async function loadAdminConcerts() {
+  const container = document.getElementById('admin-concerts-list');
+  const { data } = await sb.from('concerts').select('*').order('created_at', { ascending: false });
+  if (!data || data.length === 0) {
+    container.innerHTML = '<p style="font-family:\'Space Mono\',monospace; font-size:0.72rem; color:rgba(240,236,227,0.3);">No concerts uploaded yet.</p>';
+    return;
+  }
+  let html = `<table class="admin-table"><thead><tr>
+    <th>Date</th><th>Artist</th><th>Venue</th><th>Genres</th><th>Action</th>
+  </tr></thead><tbody>`;
+  data.forEach(c => {
+    const genres = Array.isArray(c.genres) ? c.genres.join(', ') : '';
+    html += `<tr>
+      <td>${c.date||''}</td>
+      <td>${c.artist||''}</td>
+      <td>${c.venue||''}</td>
+      <td class="genres-cell">${genres}</td>
+      <td><button class="btn sm danger" onclick="deleteConcert('${c.id}')">Delete</button></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+async function deleteConcert(id) {
+  if (!confirm('Delete this concert?')) return;
+  await sb.from('concerts').delete().eq('id', id);
+  showToast('Concert deleted.');
+  await loadConcerts();
+  await loadAdminConcerts();
+}
+
+async function clearAllConcerts() {
+  if (!confirm('Delete ALL concerts? This cannot be undone.')) return;
+  await sb.from('interests').delete().neq('concert_id', '00000000-0000-0000-0000-000000000000');
+  await sb.from('concerts').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  showToast('All concerts cleared.');
+  allConcerts = [];
+  userInterests = new Set();
+  renderConcerts();
+  loadAdminConcerts();
+}
+
+// ══════════════════════════════════════════════
+//  REALTIME — live interest updates
+// ══════════════════════════════════════════════
+sb.channel('interests-changes')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'interests' }, () => {
+    if (currentUser) {
+      sb.from('interests').select('concert_id').eq('user_name', currentUser.name).then(({ data }) => {
+        userInterests = new Set((data||[]).map(r => r.concert_id));
+        renderConcerts();
+      });
+    }
+  })
+  .subscribe();
+
+// ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
+checkAdminAccess();
+loadConcerts();
+</script>
+</body>
+</html>
