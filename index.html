@@ -58,16 +58,17 @@
       background: rgba(10,10,10,0.88);
       backdrop-filter: blur(12px);
     }
-
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,400;1,700;1,900&display=swap');
     .logo {
-      font-family: 'Bebas Neue', sans-serif;
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
       font-size: clamp(2.2rem, 5vw, 3.8rem);
       letter-spacing: 0.12em;
       color: var(--white);
       text-transform: uppercase;
       line-height: 1;
     }
-    .logo span { color: var(--accent); }
+    
 
     .header-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 
@@ -197,7 +198,7 @@
       font-family: 'Bebas Neue', sans-serif;
       font-size: 1.1rem;
       letter-spacing: 0.15em;
-      color: rgba(240,236,227,0.3);
+      color: rgba(99,49,152,0.8));
       text-transform: uppercase;
     }
 
@@ -249,12 +250,12 @@
     }
     .concert-card:hover {
       transform: translateY(-3px);
-      border-color: rgba(232,197,71,0.4);
+      border-color: rgba(99,49,152,0.8);
       box-shadow: 0 12px 40px rgba(0,0,0,0.5);
     }
     .concert-card:hover::before { opacity: 1; }
     .concert-card.interested {
-      border-color: rgba(232,197,71,0.55);
+      border-color: rgba(99,49,152,0.8));
     }
     .concert-card.interested::before { opacity: 1; }
 
@@ -523,7 +524,7 @@
 
   <!-- ══ HEADER ══ -->
   <header>
-    <div class="logo">Synes<span>thesia</span></div>
+    <div class="logo">Synesthesia</div>
     <div class="header-right">
       <span class="tag-pill">Chapel Hill · Live Music</span>
       <div id="user-bar">
