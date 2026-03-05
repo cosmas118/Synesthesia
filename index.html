@@ -1039,8 +1039,9 @@ async function loadAdminReport() {
   container.innerHTML = '<p style="font-family:\'Space Mono\',monospace; font-size:0.72rem; color:rgba(240,236,227,0.3);">Loading…</p>';
 
   const { data: users } = await sb.from('users').select('name');
-  const { data: interests } = await sb.from('interests').select('user_name, concert_id');
-  const { data: concerts } = await sb.from('concerts').select('id, artist, date, venue');
+  const { data: interests, error: intErr } = await sb
+    .from('interests')
+    .select('user_name, concert_id, concerts(artist, date, venue)');  const { data: concerts } = await sb.from('concerts').select('id, artist, date, venue');
 
   if (!users || !interests || !concerts) {
     container.innerHTML = '<p style="color:var(--accent2); font-size:0.75rem; font-family:\'Space Mono\',monospace;">Error loading data.</p>';
@@ -1054,16 +1055,15 @@ async function loadAdminReport() {
   users.forEach(u => userMap[u.name] = []);
   interests.forEach(i => {
     if (!userMap[i.user_name]) userMap[i.user_name] = [];
-    userMap[i.user_name].push(i.concert_id);
+    if (i.concerts) userMap[i.user_name].push(i.concerts);
   });
 
   let html = '<table class="admin-table"><thead><tr><th>User</th><th>Interested In</th></tr></thead><tbody>';
   Object.entries(userMap).forEach(([name, concertIds]) => {
-    const shows = concertIds.map(id => {
-      const c = concertMap[id];
-      return c ? `${c.artist} (${c.date})` : id;
-    }).join(', ') || '<em style="opacity:0.4">None yet</em>';
-    html += `<tr><td><strong>${name}</strong></td><td class="genres-cell">${shows}</td></tr>`;
+    const showList = shows.length
+      ? shows.map(c => `${c.artist} (${c.date})`).join(', ')
+      : '<em style="opacity:0.4">None yet</em>';
+    html += `<tr><td><strong>${name}</strong></td><td class="genres-cell">${showList}</td></tr>`;
   });
   html += '</tbody></table>';
   container.innerHTML = html;
