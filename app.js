@@ -45,10 +45,12 @@ async function doLogin(username, password) {
     .select('*')
     .eq('name', username)
     .single();
+document.getElementById('admin-open-btn').style.display = '';
 
   if (!data || data.password_hash !== hash) {
     showToast('Login failed', true);
     return;
+    
   }
 
   currentUser = data;
@@ -284,7 +286,101 @@ function checkAdminAccess() {
     alert('Admin panel temporarily disabled in this version');
   }
 }
+const ADMIN_PASSWORD = 'admin123'; // you can change this
 
+function openAdminPanel() {
+  const pw = prompt("Admin password:");
+
+  if (pw !== ADMIN_PASSWORD) {
+    alert("Incorrect password");
+    return;
+  }
+
+  document.getElementById('admin-panel').classList.add('open');
+  loadAdminConcerts();
+}
+
+function closeAdminPanel() {
+  document.getElementById('admin-panel').classList.remove('open');
+}
+async function createUser() {
+  const name = document.getElementById('new-user-name').value;
+  const pass = document.getElementById('new-user-pass').value;
+
+  const status = document.getElementById('user-status');
+
+  if (!name || !pass) {
+    status.textContent = 'Fill out both fields';
+    return;
+  }
+
+  const hash = await hashPassword(pass);
+
+  const { error } = await sb.from('users').insert({
+    name,
+    password_hash: hash
+  });
+
+  if (error) {
+    status.textContent = 'Error creating user';
+  } else {
+    status.textContent = 'User created!';
+  }
+}
+function handleCSVUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  Papa.parse(file, {
+    header: true,
+    complete: async (results) => {
+      const rows = results.data;
+
+      const records = rows.map(r => ({
+        date: r.date,
+        venue: r.venue,
+        artist: r.artist,
+        descp: r.desc,
+        genres: r.genres ? r.genres.split('|') : [],
+        link: r.link
+      }));
+
+      const { error } = await sb.from('concerts').insert(records);
+
+      if (error) {
+        document.getElementById('upload-status').textContent = 'Upload failed';
+      } else {
+        document.getElementById('upload-status').textContent = 'Upload success!';
+        loadConcerts();
+      }
+    }
+  });
+}
+async function loadAdminConcerts() {
+  const { data } = await sb.from('concerts').select('*');
+
+  const container = document.getElementById('admin-concerts');
+
+  container.innerHTML = '';
+
+  data.forEach(c => {
+    const div = document.createElement('div');
+
+    div.innerHTML = `
+      ${c.artist} (${c.date})
+      <button onclick="deleteConcert('${c.id}')">Delete</button>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+async function deleteConcert(id) {
+  await sb.from('concerts').delete().eq('id', id);
+  loadAdminConcerts();
+  loadConcerts();
+}
 // ═════════ INIT ═════════
 checkAdminAccess();
 loadConcerts();
+
