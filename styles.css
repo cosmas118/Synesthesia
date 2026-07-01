@@ -1,14 +1,62 @@
-/* Dropdown styling */
-select {
-  background: #111;
+body {
+  margin: 0;
+  font-family: 'DM Sans', sans-serif;
+  background: #0a0a0a;
   color: #f0ece3;
-  border: 1px solid rgba(240,236,227,0.2);
-  padding: 6px 10px;
-  font-family: 'Space Mono';
+}
+
+/* Header */
+header {
+  display: flex;
+  justify-content: space-between;
+  padding: 20px 40px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2rem;
+}
+
+.tag-pill {
   font-size: 0.7rem;
 }
 
-/* Read more */
+/* Toolbar */
+#toolbar {
+  display: flex;
+  gap: 10px;
+  padding: 20px;
+}
+
+select {
+  background: #111;
+  color: #f0ece3;
+  border: 1px solid rgba(255,255,255,0.2);
+  padding: 6px 10px;
+}
+
+/* Grid */
+#concert-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  padding: 20px;
+}
+
+/* Card */
+.concert-card {
+  background: #111;
+  padding: 20px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.card-artist {
+  font-size: 1.3rem;
+  margin-bottom: 6px;
+}
+
+/* Description */
 .card-desc.short {
   display: -webkit-box;
   -webkit-line-clamp: 4;
@@ -16,16 +64,10 @@ select {
   overflow: hidden;
 }
 
-.card-desc.expanded {
-  display: block;
-}
-
 .read-more-btn {
-  font-family: 'Space Mono';
-  font-size: 0.6rem;
   color: #e8c547;
   background: none;
   border: none;
   cursor: pointer;
-  margin-bottom: 14px;
 }
+``
