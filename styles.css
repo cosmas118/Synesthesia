@@ -7,7 +7,11 @@
   --glass-border: rgba(232,197,71,0.18);
   --radius: 2px;
 }
-
+main {
+  padding: 40px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
 * {
   box-sizing: border-box;
   margin: 0;
@@ -20,6 +24,17 @@ body {
   font-family: 'DM Sans', sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
+}
+#concert-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+.concert-card {
+ : 1px solid var(--glass-border);
+  padding: 26px;
+  position: relative;
+  transition: 0.2s;
 }
 
 /* ✅ BACKGROUND */
