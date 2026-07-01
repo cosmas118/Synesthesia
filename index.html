@@ -81,6 +81,29 @@
 
 <!-- ✅ YOUR JS -->
 <script src="app.js"></script>
+<div id="admin-panel">
+  <div class="admin-header">
+    <h1>⚡ Admin Panel</h1>
+    <button onclick="closeAdminPanel()">Close</button>
+  </div>
 
+  <div class="admin-body">
+
+    <h2>Upload CSV</h2>
+    <input type="file" id="csv-input" accept=".csv" onchange="handleCSVUpload(event)" />
+    <p id="upload-status"></p>
+
+    <h2>Create User</h2>
+    <input id="new-user-name" placeholder="Username">
+    <input id="new-user-pass" type="password" placeholder="Password">
+    <button onclick="createUser()">Create</button>
+    <p id="user-status"></p>
+
+    <h2>All Concerts</h2>
+    <div id="admin-concerts"></div>
+
+  </div>
+</div>
+``
 </body>
 </html>
