@@ -310,32 +310,6 @@ async function createUser() {
   showToast('User created');
 }
 
-function handleCSVUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  Papa.parse(file, {
-    header: true,
-    complete: async (results) => {
-      const rows = results.data;
-
-      const records = rows.map(r => ({
-        date: r.date,
-        venue: r.venue,
-        artist: r.artist,
-        descp: r.desc,
-        genres: r.genres ? r.genres.split('|') : [],
-        link: r.link
-      }));
-
-      await sb.from('concerts').insert(records);
-
-      showToast('Upload complete');
-      loadConcerts();
-      loadAdminConcerts();
-    }
-  });
-}
 
 async function loadAdminConcerts() {
   const { data } = await sb.from('concerts').select('*');
@@ -454,4 +428,3 @@ function uploadCSV() {
 }
 // ═════════ INIT ═════════
 loadConcerts();
-``
