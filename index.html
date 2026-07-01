@@ -83,27 +83,36 @@
 <script src="app.js"></script>
 <div id="admin-panel">
   <div class="admin-header">
-    <h1>⚡ Admin Panel</h1>
-    <button onclick="closeAdminPanel()">Close</button>
+    <h1>⚡ Dashboard</h1>
+    <button class="btn danger" onclick="closeAdminPanel()">Close</button>
   </div>
 
   <div class="admin-body">
 
-    <h2>Upload CSV</h2>
-    <input type="file" id="csv-input" accept=".csv" onchange="handleCSVUpload(event)" />
-    <p id="upload-status"></p>
+    <!-- Upload -->
+    <div class="admin-section">
+      <h2>Upload Concerts</h2>
+      <input type="file" accept=".csv" onchange="handleCSVUpload(event)">
+      <p id="upload-status"></p>
+    </div>
 
-    <h2>Create User</h2>
-    <input id="new-user-name" placeholder="Username">
-    <input id="new-user-pass" type="password" placeholder="Password">
-    <button onclick="createUser()">Create</button>
-    <p id="user-status"></p>
+    <!-- Create User -->
+    <div class="admin-section">
+      <h2>Create User</h2>
+      <input id="new-user-name" placeholder="Username">
+      <input id="new-user-pass" type="password" placeholder="Password">
+      <button class="btn solid" onclick="createUser()">Create User</button>
+      <p id="user-status"></p>
+    </div>
 
-    <h2>All Concerts</h2>
-    <div id="admin-concerts"></div>
+    <!-- Concerts -->
+    <div class="admin-section">
+      <h2>Manage Concerts</h2>
+      <div id="admin-concerts"></div>
+    </div>
 
   </div>
 </div>
-``
+````
 </body>
 </html>
