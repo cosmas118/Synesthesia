@@ -361,7 +361,37 @@ async function deleteConcert(id) {
   loadConcerts();
   loadAdminConcerts();
 }
+function uploadCSV() {
+  const input = document.getElementById('csv-file');
+  const file = input.files[0];
 
+  if (!file) {
+    showToast('Please select a file first', true);
+    return;
+  }
+
+  Papa.parse(file, {
+    header: true,
+    complete: async (results) => {
+      const rows = results.data;
+
+      const records = rows.map(r => ({
+        date: r.date,
+        venue: r.venue,
+        artist: r.artist,
+        descp: r.desc,
+        genres: r.genres ? r.genres.split('|') : [],
+        link: r.link
+      }));
+
+      await sb.from('concerts').insert(records);
+
+      showToast('Upload complete');
+      loadConcerts();
+      loadAdminConcerts();
+    }
+  });
+}
 // ═════════ INIT ═════════
 loadConcerts();
 ``
