@@ -234,3 +234,37 @@ header {
 .card-genres {
   padding-top: 4px;
 }
+
+#admin-panel {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.95);
+  z-index: 999;
+  overflow-y: auto;
+}
+
+#admin-panel.open {
+  display: block;
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.admin-body {
+  padding: 20px;
+}
+
+#admin-panel input {
+  display: block;
+  margin-bottom: 10px;
+  padding: 8px;
+  background: #111;
+  color: white;
+  border: 1px solid #444;
+}
+``
