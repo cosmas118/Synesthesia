@@ -6,34 +6,143 @@ const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ═════════ STATE ═════════
+let currentUser = null;
 let allConcerts = [];
+let userInterests = new Set();
+
 let activeGenreFilter = null;
 let activeVenueFilter = null;
+let showOnlyInterested = false;
 let sortAscending = true;
 
-// ═════════ LOAD CONCERTS ═════════
-async function loadConcerts() {
-  document.getElementById('loading').style.display = 'block';
+// ═════════ UTIL ═════════
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (isError ? ' error' : '');
+  setTimeout(() => t.className = '', 3000);
+}
 
-  const { data, error } = await sb
-    .from('concerts')
-    .select('*');
+// Simple hash
+async function hashPassword(pw) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
 
-  document.getElementById('loading').style.display = 'none';
+// ═════════ LOGIN ═════════
+function openLoginModal() {
+  const username = prompt("Username:");
+  const password = prompt("Password:");
+  if (!username || !password) return;
+  doLogin(username, password);
+}
 
-  if (error) {
-    console.error(error);
+async function doLogin(username, password) {
+  const hash = await hashPassword(password);
+
+  const { data } = await sb
+    .from('users')
+    .select('*')
+    .eq('name', username)
+    .single();
+
+  if (!data || data.password_hash !== hash) {
+    showToast('Login failed', true);
     return;
   }
 
-  allConcerts = data || [];
+  currentUser = data;
 
-  buildGenreFilters();
-  buildVenueFilters();
+  document.getElementById('login-btn').style.display = 'none';
+  document.getElementById('logout-btn').style.display = '';
+  document.getElementById('show-interested-btn').style.display = '';
+
+  loadUserInterests();
+
+  showToast('Welcome ' + username);
   renderConcerts();
 }
 
-// ═════════ BUILD FILTERS ═════════
+function logout() {
+  currentUser = null;
+  userInterests = new Set();
+  showOnlyInterested = false;
+
+  document.getElementById('login-btn').style.display = '';
+  document.getElementById('logout-btn').style.display = 'none';
+  document.getElementById('show-interested-btn').style.display = 'none';
+
+  renderConcerts();
+}
+
+// ═════════ INTERESTS ═════════
+async function loadUserInterests() {
+  if (!currentUser) return;
+
+  const { data } = await sb
+    .from('interests')
+    .select('concert_id')
+    .eq('user_name', currentUser.name);
+
+  userInterests = new Set((data || []).map(r => r.concert_id));
+}
+
+async function toggleInterest(concertId) {
+  if (!currentUser) {
+    openLoginModal();
+    return;
+  }
+
+  if (userInterests.has(concertId)) {
+    await sb.from('interests').delete()
+      .eq('user_name', currentUser.name)
+      .eq('concert_id', concertId);
+
+    userInterests.delete(concertId);
+  } else {
+    await sb.from('interests').insert({
+      user_name: currentUser.name,
+      concert_id: concertId
+    });
+
+    userInterests.add(concertId);
+  }
+
+  renderConcerts();
+}
+
+// ═════════ FILTERS ═════════
+function handleGenreDropdown(el) {
+  activeGenreFilter = el.value || null;
+  renderConcerts();
+}
+
+function handleVenueDropdown(el) {
+  activeVenueFilter = el.value || null;
+  renderConcerts();
+}
+
+function toggleSortDate() {
+  sortAscending = !sortAscending;
+  document.getElementById('sort-date-btn').textContent =
+    sortAscending ? 'Date ↑' : 'Date ↓';
+  renderConcerts();
+}
+
+function toggleInterestedFilter() {
+  if (!currentUser) {
+    openLoginModal();
+    return;
+  }
+
+  showOnlyInterested = !showOnlyInterested;
+  document.getElementById('show-interested-btn')
+    .classList.toggle('active', showOnlyInterested);
+
+  renderConcerts();
+}
+
+// ═════════ BUILD FILTER OPTIONS ═════════
 function buildGenreFilters() {
   const set = new Set();
 
@@ -72,31 +181,34 @@ function buildVenueFilters() {
   });
 }
 
-// ═════════ FILTER HANDLERS ═════════
-function handleGenreDropdown(el) {
-  activeGenreFilter = el.value || null;
+// ═════════ LOAD CONCERTS ═════════
+async function loadConcerts() {
+  document.getElementById('loading').style.display = 'block';
+
+  const { data } = await sb.from('concerts').select('*');
+
+  document.getElementById('loading').style.display = 'none';
+
+  allConcerts = data || [];
+
+  buildGenreFilters();
+  buildVenueFilters();
   renderConcerts();
 }
 
-function handleVenueDropdown(el) {
-  activeVenueFilter = el.value || null;
-  renderConcerts();
-}
-
-function toggleSortDate() {
-  sortAscending = !sortAscending;
-
-  document.getElementById('sort-date-btn').textContent =
-    sortAscending ? 'Date ↑' : 'Date ↓';
-
-  renderConcerts();
+// ═════════ READ MORE ═════════
+function toggleReadMore(id, btn) {
+  const el = document.getElementById(`desc-${id}`);
+  el.classList.toggle('expanded');
+  btn.textContent = el.classList.contains('expanded')
+    ? 'Show Less'
+    : 'Read More';
 }
 
 // ═════════ RENDER ═════════
 function renderConcerts() {
   let concerts = [...allConcerts];
 
-  // Genre filter
   if (activeGenreFilter) {
     concerts = concerts.filter(c =>
       Array.isArray(c.genres) &&
@@ -104,14 +216,14 @@ function renderConcerts() {
     );
   }
 
-  // Venue filter
   if (activeVenueFilter) {
-    concerts = concerts.filter(c =>
-      c.venue === activeVenueFilter
-    );
+    concerts = concerts.filter(c => c.venue === activeVenueFilter);
   }
 
-  // Date sort
+  if (showOnlyInterested) {
+    concerts = concerts.filter(c => userInterests.has(c.id));
+  }
+
   concerts.sort((a, b) => {
     const d1 = new Date(a.date);
     const d2 = new Date(b.date);
@@ -119,22 +231,26 @@ function renderConcerts() {
   });
 
   const grid = document.getElementById('concert-grid');
+  const empty = document.getElementById('empty-state');
+
   grid.innerHTML = '';
 
   if (concerts.length === 0) {
-    document.getElementById('empty-state').style.display = 'block';
+    empty.style.display = 'block';
     return;
   }
 
-  document.getElementById('empty-state').style.display = 'none';
+  empty.style.display = 'none';
 
   concerts.forEach(c => {
-    const card = document.createElement('div');
-    card.className = 'concert-card';
+    const isInterested = userInterests.has(c.id);
 
-    const genres = (c.genres || []).map(g =>
-      `<span class="genre-tag">${g}</span>`
-    ).join('');
+    const genres = (c.genres || [])
+      .map(g => `<span class="genre-tag">${g}</span>`)
+      .join('');
+
+    const card = document.createElement('div');
+    card.className = 'concert-card' + (isInterested ? ' interested' : '');
 
     card.innerHTML = `
       <div class="card-date">${c.date || ''}</div>
@@ -147,12 +263,18 @@ function renderConcerts() {
         ${c.descp || ''}
       </div>
 
-      <button class="read-more-btn" onclick="toggleReadMore('${c.id}', this)">
+      <button class="read-more-btn"
+        onclick="toggleReadMore('${c.id}', this)">
         Read More
       </button>
 
       <div class="card-footer">
-        ${c.link ? `<a href="${c.link}" target="_blank" class="ticket-link">Tickets →</a>` : ''}
+        <button class="interest-btn ${isInterested ? 'on' : ''}"
+          onclick="toggleInterest('${c.id}')">
+          ${isInterested ? '★ Interested' : '☆ Add'}
+        </button>
+
+        ${c.link ? `<a class="ticket-link" href="${c.link}" target="_blank">Tickets →</a>` : ''}
       </div>
     `;
 
@@ -160,17 +282,13 @@ function renderConcerts() {
   });
 }
 
-// ═════════ READ MORE ═════════
-function toggleReadMore(id, btn) {
-  const desc = document.getElementById(`desc-${id}`);
-  desc.classList.toggle('expanded');
-
-  if (desc.classList.contains('expanded')) {
-    btn.textContent = 'Show Less';
-  } else {
-    btn.textContent = 'Read More';
+// ═════════ ADMIN (simple access via URL) ═════════
+function checkAdminAccess() {
+  if (window.location.hash === '#admin') {
+    alert('Admin panel temporarily disabled in this version');
   }
 }
 
 // ═════════ INIT ═════════
+checkAdminAccess();
 loadConcerts();
